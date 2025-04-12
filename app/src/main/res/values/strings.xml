@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">My Gallery</string>
+    <string name="permission_denied">Permission denied. Please grant storage access.</string>
+    <string name="media">Media</string>
+    <string name="folders">Folders</string>
+    <string name="edit_button">Edit</string>
+    <string name="delete_button">Bin</string>
+    <string name="share_button">Share</string>
+</resources>
