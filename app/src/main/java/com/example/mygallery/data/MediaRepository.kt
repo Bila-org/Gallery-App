@@ -1,11 +1,15 @@
 package com.example.mygallery.data
 
+import android.app.Activity
 import android.content.ContentUris
 import android.content.Context
 import android.net.Uri
+import android.os.Build
 import android.os.Parcelable
 import android.provider.MediaStore
 import android.util.Log
+import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.work.Constraints
@@ -20,6 +24,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.none
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlin.math.max
 
@@ -58,10 +63,10 @@ interface MediaRepository{
 
     // Functions for trash/favorites
 //    suspend fun getFavorites(): List<MediaItem>
-  //  suspend fun getTrashedItems(): List<MediaItem>
+    //  suspend fun getTrashedItems(): List<MediaItem>
 
     fun calculateRemainingTime(mediaItem: MediaItem):Long
-
+    suspend fun deletePermanently(mediaItem: MediaItem)
 
     suspend fun toggleFavorite(mediaItem: MediaItem)
     suspend fun trashMedia(mediaItem: MediaItem)
@@ -82,7 +87,7 @@ class MediaRepositoryImpl (
 
     init{
         // starts when repository is first created
-       // schedulePeriodicCleanup()
+        // schedulePeriodicCleanup()
     }
 
 
@@ -120,30 +125,97 @@ class MediaRepositoryImpl (
     override suspend fun trashMedia(mediaItem: MediaItem){
         mediaDao.trashMedia(mediaItem.id, System.currentTimeMillis())
 
-      /*  mediaDao.upsertMedia(mediaItem.copy(
-            isTrashed = true,
-            dateAdded = System.currentTimeMillis()
-        ))
-*/
+        /*  mediaDao.upsertMedia(mediaItem.copy(
+              isTrashed = true,
+              dateAdded = System.currentTimeMillis()
+          ))
+  */
     }
 
     override suspend fun restoreMedia(mediaItem: MediaItem){
-        mediaDao.upsertMedia(mediaItem.copy(
-            isTrashed = false,
-            dateAdded = null
-        ))
+        withContext(Dispatchers.IO){
+            try{
+                mediaDao.upsertMedia(
+                    mediaItem.copy(
+                        isTrashed = false,
+                        dateTrashed = null
+                    )
+                )
+            } catch (e: Exception){
+                e.printStackTrace()
+                throw IOException("Failed to restore media",e)
+            }
+        }
     }
 
     override suspend fun emptyTrash(){
         mediaDao.emptyTrash()
     }
 
-    suspend fun deletePermanently(mediaItem: MediaItem){
-        // Delete from storage
-        context.contentResolver.delete(mediaItem.toUri(), null, null)
-        // Delete from Database
-        mediaDao.deleteMedia(mediaItem)
+    override suspend fun deletePermanently(mediaItem: MediaItem){
+        withContext(Dispatchers.IO){
+            try {
+                // Delete from storage
+                val rowsDeleted = context.contentResolver
+                    .delete(mediaItem.toUri(), null, null)
+                // Delete from Database
+                if(rowsDeleted > 0){
+                    mediaDao.deleteMedia(mediaItem)
+                    return@withContext
+                }
+                if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.R){
+                    try {
+                        val deleteRequest = MediaStore.createDeleteRequest(
+                            context.contentResolver,
+                            listOf(mediaItem.toUri())
+                        )
+
+                        val intentSender = deleteRequest.intentSender
+                        context.startIntentSender(
+                            intentSender,null,0,0,0
+                        )
+                        mediaDao.deleteMedia(mediaItem)
+                        return@withContext
+                    }catch (e:Exception){
+                        e.printStackTrace()
+                    }
+                }
+                //throw IOException("Failed to delete media from storage")
+
+            }  catch (e: SecurityException){
+                throw SecurityException("Permission denied to delete media")
+               // e.printStackTrace()
+            }catch (e:Exception){
+                throw IOException("Delete request failed:${e.message}")
+                //e.printStackTrace()
+            }
+        }
+
     }
+
+    /*    @RequiresApi(Build.VERSION_CODES.R)
+        fun requestDeletePermission(activity: Activity, uris: List<Uri>)
+        {
+            val deleteRequest = MediaStore.createDeleteRequest(
+                activity.contentResolver,
+                uris
+            )
+            try{
+                activity.startIntentSenderForResult(
+                    deleteRequest.intentSender,
+                    REQUEST_CODE_DELETE_PERMISSION,
+                    null,
+                    0,
+                    0,
+                    0,
+                    null
+                )
+            }catch (e:Exception){
+                Toast.makeText(activity, "Could not request delete permission",
+                    Toast.LENGTH_SHORT).show()
+            }
+        }
+    */
 
     override fun calculateRemainingTime(mediaItem: MediaItem): Long {
         if (mediaItem.dateTrashed == null)
@@ -195,72 +267,72 @@ class MediaRepositoryImpl (
 
     override suspend fun loadMedia(): List<MediaItem> {
         return  withContext(Dispatchers.IO) {
-                    _mediaSet.clear()
-                    val deviceMedia = loadAllMedia()
-                    syncWithDatabase(deviceMedia)
-                    mediaDao.getMediaItems()
+            _mediaSet.clear()
+            val deviceMedia = loadAllMedia()
+            syncWithDatabase(deviceMedia)
+            mediaDao.getMediaItems()
         }
     }
 
 
     override suspend fun getMedia(filter: MediaFilter): List<MediaItem> {
-         return  withContext(Dispatchers.IO) {
-                 when (filter) {
-                     MediaFilter.ALL -> {
-                         mediaDao.getMediaItems()
-                     }
-
-                     MediaFilter.IMAGES -> {
-                         mediaDao.getMediaItems().filter { !it.isVideo }
-                     }
-
-                     MediaFilter.VIDEOS -> {
-                         mediaDao.getMediaItems().filter { it.isVideo }
-                     }
-
-                     MediaFilter.FAVORITE -> {
-                         mediaDao.getFavorites()
-                     }
-
-                     MediaFilter.TRASH -> {
-                         mediaDao.getTrashedItems()
-                     }
-
-                     else -> emptyList()
-                 }
-         }
-     }
-       /*  return withContext(Dispatchers.IO)
-        {
-            when(filter) {
+        return  withContext(Dispatchers.IO) {
+            when (filter) {
                 MediaFilter.ALL -> {
-                    _mediaSet.clear()
-                    loadAllMedia()
-                    syncWithDatabase(_mediaSet.toList())
-                    mediaDao.getMediaItems().first()
-                    // _mediaSet.toList()
+                    mediaDao.getMediaItems()
                 }
 
                 MediaFilter.IMAGES -> {
-                   mediaDao.getMediaItems().filter {
-                        !it.isVideo
-                    }
+                    mediaDao.getMediaItems().filter { !it.isVideo }
                 }
-                    MediaFilter.VIDEOS -> {
-                        mediaDao.getMediaItems().filter {
-                            it.isVideo
-                        }
-                    }
-                    MediaFilter.FAVORITE ->
-                        mediaDao.getFavorites()
-                    MediaFilter.TRASH ->
-                        mediaDao.getTrashedItems()
-                    else -> emptyList()
-                }
-        }
-     }
 
-*/
+                MediaFilter.VIDEOS -> {
+                    mediaDao.getMediaItems().filter { it.isVideo }
+                }
+
+                MediaFilter.FAVORITE -> {
+                    mediaDao.getFavorites()
+                }
+
+                MediaFilter.TRASH -> {
+                    mediaDao.getTrashedItems()
+                }
+
+                else -> emptyList()
+            }
+        }
+    }
+    /*  return withContext(Dispatchers.IO)
+     {
+         when(filter) {
+             MediaFilter.ALL -> {
+                 _mediaSet.clear()
+                 loadAllMedia()
+                 syncWithDatabase(_mediaSet.toList())
+                 mediaDao.getMediaItems().first()
+                 // _mediaSet.toList()
+             }
+
+             MediaFilter.IMAGES -> {
+                mediaDao.getMediaItems().filter {
+                     !it.isVideo
+                 }
+             }
+                 MediaFilter.VIDEOS -> {
+                     mediaDao.getMediaItems().filter {
+                         it.isVideo
+                     }
+                 }
+                 MediaFilter.FAVORITE ->
+                     mediaDao.getFavorites()
+                 MediaFilter.TRASH ->
+                     mediaDao.getTrashedItems()
+                 else -> emptyList()
+             }
+     }
+    }
+
+    */
 
 
     private suspend fun syncWithDatabase(deviceMedia: List<MediaItem>) {
@@ -332,7 +404,7 @@ class MediaRepositoryImpl (
         }
 
     }
-*/
+    */
     private suspend fun loadAllMedia(): List<MediaItem>{
         return loadImages() + loadVideos()
     }
@@ -390,7 +462,7 @@ class MediaRepositoryImpl (
             isVideo = false
         )
     }
-*/
+    */
 
     /*
     private suspend fun loadScreenshots(): List<MediaItem>{
@@ -421,61 +493,61 @@ class MediaRepositoryImpl (
         sordOrder: String?= null,
         isVideo: Boolean
     ): List<MediaItem>{
-       // return withContext(Dispatchers.IO)
-      //  {
+        // return withContext(Dispatchers.IO)
+        //  {
         //val mediaList = mutableListOf<MediaItem>()
-            try {
-                val cursor = context.contentResolver.query(uri, projection, selection, selectionArgs,
-                    sordOrder)
-                cursor?.use{
-                    val idColumn = it.getColumnIndexOrThrow(if(isVideo) MediaStore.Video.Media._ID else MediaStore.Images.Media._ID)
-                    val nameColumn = it.getColumnIndexOrThrow(if(isVideo) MediaStore.Video.Media.DISPLAY_NAME else MediaStore.Images.Media.DISPLAY_NAME)
-                    val sizeColumn = it.getColumnIndexOrThrow(if(isVideo) MediaStore.Video.Media.SIZE else MediaStore.Images.Media.SIZE)
-                    val dateAddedColumn = it.getColumnIndexOrThrow(if(isVideo) MediaStore.Video.Media.DATE_ADDED else MediaStore.Images.Media.DATE_ADDED)
-                    val mimTypeColumn = it.getColumnIndexOrThrow(if(isVideo) MediaStore.Video.Media.MIME_TYPE else MediaStore.Images.Media.MIME_TYPE)
-                    val durationColumn = if (isVideo) {
-                        it.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
+        try {
+            val cursor = context.contentResolver.query(uri, projection, selection, selectionArgs,
+                sordOrder)
+            cursor?.use{
+                val idColumn = it.getColumnIndexOrThrow(if(isVideo) MediaStore.Video.Media._ID else MediaStore.Images.Media._ID)
+                val nameColumn = it.getColumnIndexOrThrow(if(isVideo) MediaStore.Video.Media.DISPLAY_NAME else MediaStore.Images.Media.DISPLAY_NAME)
+                val sizeColumn = it.getColumnIndexOrThrow(if(isVideo) MediaStore.Video.Media.SIZE else MediaStore.Images.Media.SIZE)
+                val dateAddedColumn = it.getColumnIndexOrThrow(if(isVideo) MediaStore.Video.Media.DATE_ADDED else MediaStore.Images.Media.DATE_ADDED)
+                val mimTypeColumn = it.getColumnIndexOrThrow(if(isVideo) MediaStore.Video.Media.MIME_TYPE else MediaStore.Images.Media.MIME_TYPE)
+                val durationColumn = if (isVideo) {
+                    it.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
+                } else {
+                    null
+                }
+                val folderNameColumn = it.getColumnIndexOrThrow(if(isVideo) MediaStore.Video.Media.BUCKET_DISPLAY_NAME else MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
+
+
+                while(it.moveToNext()){
+                    val id = it.getLong(idColumn)
+                    val name = it.getString(nameColumn)
+                    val size = it.getLong(sizeColumn)
+                    val dateAdded = it.getLong(dateAddedColumn) * 1000
+                    val mimeType = it.getString(mimTypeColumn)
+                    val folderName = it.getString(folderNameColumn)
+                    val duration = if(isVideo) {it.getLong(durationColumn!!)} else {null}
+
+                    val contentUri = if(isVideo){
+                        ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id)
                     } else {
-                        null
+                        ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
                     }
-                    val folderNameColumn = it.getColumnIndexOrThrow(if(isVideo) MediaStore.Video.Media.BUCKET_DISPLAY_NAME else MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
-
-
-                    while(it.moveToNext()){
-                        val id = it.getLong(idColumn)
-                        val name = it.getString(nameColumn)
-                        val size = it.getLong(sizeColumn)
-                        val dateAdded = it.getLong(dateAddedColumn) * 1000
-                        val mimeType = it.getString(mimTypeColumn)
-                        val folderName = it.getString(folderNameColumn)
-                        val duration = if(isVideo) {it.getLong(durationColumn!!)} else {null}
-
-                        val contentUri = if(isVideo){
-                            ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id)
-                        } else {
-                            ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
-                        }
-                         _mediaSet.add(MediaItem(
-                            id = id,
-                            uri = contentUri.toString(),
-                            name = name,
-                            size = size,
-                            dateAdded = dateAdded,
-                            mimeType = mimeType,
-                            isVideo = isVideo,
-                            folderName = folderName,
-                            duration = duration
-                        )
-                        )
-                    }
+                    _mediaSet.add(MediaItem(
+                        id = id,
+                        uri = contentUri.toString(),
+                        name = name,
+                        size = size,
+                        dateAdded = dateAdded,
+                        mimeType = mimeType,
+                        isVideo = isVideo,
+                        folderName = folderName,
+                        duration = duration
+                    )
+                    )
                 }
             }
-            catch (e: SecurityException){
-                e.printStackTrace()
-            } catch (e: Exception){
-                e.printStackTrace()
-            }
-            return _mediaSet.toList()
+        }
+        catch (e: SecurityException){
+            e.printStackTrace()
+        } catch (e: Exception){
+            e.printStackTrace()
+        }
+        return _mediaSet.toList()
         //}
     }
 }

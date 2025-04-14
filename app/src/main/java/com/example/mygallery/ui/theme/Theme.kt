@@ -265,6 +265,7 @@ val unspecified_scheme = ColorFamily(
     Color.Unspecified, Color.Unspecified, Color.Unspecified, Color.Unspecified
 )
 
+
 @Composable
 fun MyGalleryTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),

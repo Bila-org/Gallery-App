@@ -29,7 +29,7 @@ import kotlinx.coroutines.withContext
 data class GalleryUiState(
     val mediaItems: List<MediaItem> = emptyList(),
     val filteredMediaItems: List<MediaItem> = emptyList(),
-   // val trashedMediaItems: List<MediaItem> = emptyList(),
+    // val trashedMediaItems: List<MediaItem> = emptyList(),
     val currentFilter: MediaFilter = MediaFilter.ALL,
 //    var isFavorite: Boolean = false,
     val isLoading: Boolean  = false,
@@ -45,6 +45,11 @@ class GalleryViewModel (
     private val _uiState = MutableStateFlow(GalleryUiState())
     val uiState: StateFlow<GalleryUiState> = _uiState
 
+
+    init{
+        loadAllMedia()
+    }
+
     fun loadAllMedia(filter: MediaFilter = MediaFilter.ALL) {
         _uiState.update{it.copy(currentFilter = filter, isLoading = true)}
         viewModelScope.launch {
@@ -56,25 +61,25 @@ class GalleryViewModel (
             val mediaList = mediaRepository.loadMedia()
             _uiState.update { it.copy(
                 mediaItems = mediaList,
-               // filteredMediaItems = mediaList,
+                // filteredMediaItems = mediaList,
                 isLoading = false
             ) }
-       }
-   }
+        }
+    }
 
     fun getMedia(filter:MediaFilter)  = viewModelScope.launch {
         _uiState.update{it.copy(currentFilter = filter, isLoading = true)}
         viewModelScope.launch {
 
-          /*  _uiState.update {
-                it.copy(
-                    mediaItems = emptyList(),
-                    filteredMediaItems = emptyList(),
-                    isLoading = true, error = null
-                )
-            }*/
+            /*  _uiState.update {
+                  it.copy(
+                      mediaItems = emptyList(),
+                      filteredMediaItems = emptyList(),
+                      isLoading = true, error = null
+                  )
+              }*/
             val mediaList = mediaRepository.getMedia(filter)
-                _uiState.update { it.copy(
+            _uiState.update { it.copy(
                 filteredMediaItems = mediaList,
                 isLoading = false
             ) }
@@ -86,7 +91,7 @@ class GalleryViewModel (
             it.toUri() == uri
         }
         mediaItem?.let { mediaRepository.toggleFavorite(it) }
-      //  refreshMedia()
+        //  refreshMedia()
     }
 
     fun trashMedia(uri: Uri) = viewModelScope.launch {
@@ -96,7 +101,7 @@ class GalleryViewModel (
         }
         mediaItem?.let { mediaRepository.trashMedia(it) }
 
-      //  refreshMedia()
+        //  refreshMedia()
         /*
         _uiState.value.mediaItems.
         _uiState.{ it.copy(
@@ -106,7 +111,8 @@ class GalleryViewModel (
 */
     }
 
-    fun restoreMedia(mediaItem: MediaItem) = viewModelScope.launch {
+    suspend fun restoreMedia(mediaItem: MediaItem)
+     {
         mediaRepository.restoreMedia(mediaItem)
     }
 
@@ -115,9 +121,8 @@ class GalleryViewModel (
     }
 
     fun calculateRemainingTime(mediaItem: MediaItem): Long {
-            return mediaRepository.calculateRemainingTime(mediaItem)
-       }
-
+        return mediaRepository.calculateRemainingTime(mediaItem)
+    }
 
 
     /*
@@ -133,12 +138,14 @@ class GalleryViewModel (
 
     fun loadAllFolders(): Map<String, List<MediaItem>>{
         return _uiState.value.filteredMediaItems.filter{it.folderName != null && !it.isTrashed}.groupBy {it.folderName!!}
-           // .map{(folderName, mediaList) -> Folder(folderName, mediaList)}
-        }
+        // .map{(folderName, mediaList) -> Folder(folderName, mediaList)}
+    }
 
 
-    private suspend fun deletePermanently(mediaItem: MediaItem){
-
+    suspend fun deletePermanently(mediaItem: MediaItem){
+        //viewModelScope.launch {
+            mediaRepository.deletePermanently(mediaItem)
+       // }
     }
 
 

@@ -12,7 +12,7 @@ fun groupMediaByMonth(mediaList: List<MediaItem>): Map<String, List<MediaItem>>{
     val monthYearFormatter = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
 
     for (media in mediaList){
-        calendar.timeInMillis = media.dateAdded!!
+        calendar.timeInMillis = if (media.dateAdded != null) media.dateAdded else throw NullPointerException("Expression 'media.dateAdded' must not be null")
         val yearMonth = "${calendar.get(Calendar.YEAR)}-${calendar.get(Calendar.MONTH) + 1}" // Format "YYYY-MM"
 
         val formattedMonthYear = monthYearFormatter.format(calendar.time)
