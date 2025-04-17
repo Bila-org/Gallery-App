@@ -283,11 +283,13 @@ class MediaRepositoryImpl (
                 }
 
                 MediaFilter.IMAGES -> {
-                    mediaDao.getMediaItems().filter { !it.isVideo }
+                    mediaDao.getImageItems()
+                    //mediaDao.getMediaItems().filter { !it.isVideo }
                 }
 
                 MediaFilter.VIDEOS -> {
-                    mediaDao.getMediaItems().filter { it.isVideo }
+                  mediaDao.getVideoItems()
+                  //  mediaDao.getMediaItems().filter { it.isVideo }
                 }
 
                 MediaFilter.FAVORITE -> {

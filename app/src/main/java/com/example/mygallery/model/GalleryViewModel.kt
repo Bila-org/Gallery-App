@@ -51,7 +51,11 @@ class GalleryViewModel (
     }
 
     fun loadAllMedia(filter: MediaFilter = MediaFilter.ALL) {
-        _uiState.update{it.copy(currentFilter = filter, isLoading = true)}
+        _uiState.update{
+            it.copy(
+                currentFilter = filter,
+                mediaItems = emptyList(),
+                isLoading = true)}
         viewModelScope.launch {
             /*  _uiState.update { it.copy(
                 mediaItems = emptyList(),
@@ -67,23 +71,23 @@ class GalleryViewModel (
         }
     }
 
-    fun getMedia(filter:MediaFilter)  = viewModelScope.launch {
-        _uiState.update{it.copy(currentFilter = filter, isLoading = true)}
-        viewModelScope.launch {
+    fun getMedia(filter:MediaFilter)  {
+        /*_uiState.update{
+            it.copy(
+                //filteredMediaItems = emptyList(),
+                currentFilter = filter,
+                isLoading = true
+            )
+        }*/
 
-            /*  _uiState.update {
-                  it.copy(
-                      mediaItems = emptyList(),
-                      filteredMediaItems = emptyList(),
-                      isLoading = true, error = null
-                  )
-              }*/
+        viewModelScope.launch {
             val mediaList = mediaRepository.getMedia(filter)
             _uiState.update { it.copy(
                 filteredMediaItems = mediaList,
                 isLoading = false
             ) }
-        } }
+        }
+    }
 
     fun toggleFavorite(uri: Uri) = viewModelScope.launch {
         // Find the media item based on the Uri
@@ -112,7 +116,7 @@ class GalleryViewModel (
     }
 
     suspend fun restoreMedia(mediaItem: MediaItem)
-     {
+    {
         mediaRepository.restoreMedia(mediaItem)
     }
 
@@ -144,8 +148,8 @@ class GalleryViewModel (
 
     suspend fun deletePermanently(mediaItem: MediaItem){
         //viewModelScope.launch {
-            mediaRepository.deletePermanently(mediaItem)
-       // }
+        mediaRepository.deletePermanently(mediaItem)
+        // }
     }
 
 

@@ -2,6 +2,7 @@ package com.example.mygallery.ui.screens.MediaViewerPagerScreen
 
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,6 +15,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PageSize
+import androidx.compose.foundation.pager.PagerDefaults
+import androidx.compose.foundation.pager.PagerSnapDistance
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
@@ -67,11 +70,11 @@ fun MediaViewerPager(
         pageCount = { mediaItems.size }
     )
 
-    /*
-    val filng = PagerDefaults.flingBehavior(
+
+    val fling = PagerDefaults.flingBehavior(
         state = pagerState,
         pagerSnapDistance = PagerSnapDistance.atMost(1)
-    )*/
+    )
 
     val coroutineScope = rememberCoroutineScope()
 
@@ -115,10 +118,9 @@ fun MediaViewerPager(
             pageSize = PageSize.Fill,
             beyondViewportPageCount = 1,
             userScrollEnabled = pagerSwipingEnabled,
-            // flingBehavior = fling
+            flingBehavior = fling,
             //    count  = mediaItems.size,
             modifier = Modifier.fillMaxSize()
-
         ) { page ->
             val currentPageMedia = mediaItems[page]
             val isActivePage = !isScrolling && page == currentActivePage

@@ -9,6 +9,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Box
@@ -67,7 +68,74 @@ fun FullScreenZoomableImage(
             //.clipToBounds()
             .background(Color.Black)
     ) {
-        val state = rememberTransformableState { zoomChange, panChange, rotationChange ->
+        Box(
+            modifier = Modifier
+                // .fillMaxSize()
+                .align(Alignment.Center)
+                .pointerInput(Unit){
+                    detectTransformGestures(
+                        onGesture = { centroid, panChange, zoomChange, rotationChange ->
+                            val isMultiFinger = zoomChange != 1f || rotationChange != 0f
+                            if (isZoomed || isMultiFinger) {
+                                scale = (scale * zoomChange).coerceIn(1f, 5f)
+
+                                val extraWidth = (scale - 1) * constraints.maxWidth
+                                val extraHeight = (scale - 1) * constraints.maxHeight
+
+                                val maxX = extraWidth / 2
+                                val maxY = extraHeight / 2
+
+                                offset = Offset(
+                                    x = (offset.x + scale * panChange.x).coerceIn(-maxX, maxX),
+                                    y = (offset.y + scale * panChange.y).coerceIn(-maxY, maxY)
+                                )
+                                rotation += rotationChange
+                            }
+                        }
+                    )
+                }
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onDoubleTap = {
+                            if (scale > 1f
+                                || rotation > 0
+                                || offset.x > 0
+                                || offset.y > 0
+                            ) {
+                                doubleTapScale.value = 1f
+                                scale = 1f
+                                offset = Offset.Zero
+                                rotation = 0f
+                            } else {
+                                doubleTapScale.value = 2f
+                                scale = 2f
+                            }
+                        }
+                    )
+                    // detect
+
+                }
+
+        ) {
+            AsyncImage(
+                model = imageUri,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        translationX = offset.x
+                        translationY = offset.y
+                        rotationZ = rotation
+                    },
+                contentScale = ContentScale.Fit
+            )
+        }
+    }
+
+
+      /*  val state = rememberTransformableState { zoomChange, panChange, rotationChange ->
                 scale = (scale * zoomChange).coerceIn(1f, 5f)
 
                 val extraWidth = (scale - 1) * constraints.maxWidth
@@ -118,11 +186,14 @@ fun FullScreenZoomableImage(
                                     }
                                 }
                             )
+                           // detect
+
                         },
+
                     contentScale = ContentScale.Fit
                 )
             }
-        }
+        }*/
         // Snackbar host
         /*SnackbarHost(
             hostState = snackbarHostState,

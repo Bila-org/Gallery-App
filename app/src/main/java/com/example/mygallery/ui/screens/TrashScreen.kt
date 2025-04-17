@@ -53,11 +53,13 @@ fun TrashScreen(
     // val groupedMedia = groupMediaByMonth(filterMediaList)
 
 
-    //LaunchedEffect(Unit) {
+    // LaunchedEffect(Unit) {
     viewModel.getMedia(MediaFilter.TRASH)
     //}
-    val groupedMedia = groupMediaByMonth(uiState.filteredMediaItems)
-
+    //val groupedMedia = groupMediaByMonth(uiState.filteredMediaItems)
+    val groupedMedia by remember(uiState.filteredMediaItems) {
+        derivedStateOf { groupMediaByMonth(uiState.filteredMediaItems) }
+    }
 
     Scaffold(
         topBar = {
@@ -68,13 +70,23 @@ fun TrashScreen(
         }
 
     ) { innerPadding ->
-        TrashItemGrid(
-            groupedMedia = groupedMedia,
-            onItemSelection = onItemSelection,
-            modifier = modifier,
-            contentPadding = innerPadding,
-            viewModel = viewModel
-        )
+        if(uiState.isLoading){
+            Box(){
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                )
+            }
+        }else{
+            TrashItemGrid(
+                groupedMedia = groupedMedia,
+                onItemSelection = onItemSelection,
+                modifier = modifier,
+                contentPadding = innerPadding,
+                viewModel = viewModel
+            )
+
+        }
     }
 }
 
@@ -132,18 +144,18 @@ fun TrashItemGrid(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
+                            .padding(2.dp)
                             .align(Alignment.BottomCenter)
                             //.background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
                             .background(
                                 Brush.horizontalGradient(
                                     colors = listOf(
-                                        Color.Transparent,
-                                        Color.Black.copy(alpha = 0.7f)
+                                        Color.Black.copy(alpha = 0.7f),
+                                        Color.Transparent
                                     )
                                 ),
                                 RoundedCornerShape(4.dp)
                             )
-                            .padding(8.dp)
                     ){
 
                         Text(
@@ -152,7 +164,7 @@ fun TrashItemGrid(
                             color = Color.White,
                             modifier = Modifier
                                 //   .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
-                                .align(Alignment.BottomEnd)
+                                .align(Alignment.BottomStart)
                             // .padding(8.dp)
                         )
                     }

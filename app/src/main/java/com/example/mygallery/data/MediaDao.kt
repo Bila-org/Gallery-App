@@ -33,4 +33,9 @@ interface MediaDao {
     @Upsert
     suspend fun upsertMedia(mediaItem : MediaItem)
 
+    @Query("SELECT * FROM MediaItem WHERE isVideo = 0 AND isTrashed = 0")
+    suspend fun getImageItems(): List<MediaItem>
+
+    @Query("SELECT * FROM MediaItem WHERE isVideo = 1 AND isTrashed = 0")
+    suspend fun getVideoItems(): List<MediaItem>
 }
